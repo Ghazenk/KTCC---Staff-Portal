@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Search, Calendar, Edit2, Download, Filter } from 'lucide-react';
+import { ArrowLeft, Search, Calendar, Edit2, Download } from 'lucide-react';
 
 export default function DonorsList() {
   const router = useRouter();
@@ -21,16 +21,25 @@ export default function DonorsList() {
 
   const fetchDonors = async () => {
     const { data, error } = await supabase.from('donors').select('*').order('created_at', { ascending: false });
+    if (error) {
+      console.warn('DB schema might not match yet. Proceeding strictly.', error);
+    }
     if (data) setDonors(data);
   };
 
   const filtered = donors.filter(d => {
+    const safeName = d.name || '';
+    const safeBlood = d.blood_group || '';
+    const safeContact = d.contact_no || d.phone || '';
+    const safeCnic = d.cnic || '';
+
     const matchesSearch = 
-      d.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      d.blood_group.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      d.phone.includes(searchQuery);
+      safeName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      safeBlood.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      safeContact.includes(searchQuery) ||
+      safeCnic.includes(searchQuery);
     
-    const matchesBlood = filterBloodGroup ? d.blood_group === filterBloodGroup : true;
+    const matchesBlood = filterBloodGroup ? safeBlood === filterBloodGroup : true;
     const matchesFrom = filterFromDate ? (d.last_donation_date && d.last_donation_date >= filterFromDate) : true;
     const matchesTo = filterToDate ? (d.last_donation_date && d.last_donation_date <= filterToDate) : true;
 
@@ -43,12 +52,12 @@ export default function DonorsList() {
       return `"${String(str).replace(/"/g, '""')}"`;
     };
 
-    const headers = ["ID", "Name", "Phone", "Blood Group", "Age", "Gender", "Address", "Last Donation Date", "Next Eligible Date", "Notes"];
+    const headers = ["ID", "Name", "Father's Name", "Age", "Gender", "Contact No", "CNIC", "Blood Group", "Weight", "Last Donation Date", "Next Eligible Date", "Address"];
     const csvRows = [headers.join(",")];
     
     for (const d of filtered) {
       const row = [
-        d.id, d.name, d.phone, d.blood_group, d.age, d.gender, d.address, d.last_donation_date, d.next_eligible_date, d.notes
+        d.id, d.name, d.fathers_name, d.age, d.gender, d.contact_no || d.phone, d.cnic, d.blood_group, d.weight, d.last_donation_date, d.next_eligible_date, d.address
       ].map(escapeCSV);
       csvRows.push(row.join(","));
     }
@@ -66,7 +75,7 @@ export default function DonorsList() {
 
   return (
     <main className="max-w-4xl mx-auto p-6 pt-12">
-      <Link href="/" className="inline-flex items-center gap-2 text-secondary mb-8 hover:text-primary transition-colors">
+      <Link href="/" className="inline-flex items-center gap-2 text-secondary mb-8 hover:text-primary transition-colors font-medium">
         <ArrowLeft size={20} /> Back to Dashboard
       </Link>
 
@@ -75,7 +84,7 @@ export default function DonorsList() {
           <h1 className="text-display-sm md:text-5xl font-display font-medium text-on-surfacemain">
             Donor Directory
           </h1>
-          <p className="text-secondary mt-2">Search and manage blood donors</p>
+          <p className="text-secondary mt-2">Search and manage exact blood donor records</p>
         </div>
         <Link href="/donors/new" className="bg-gradient-to-r from-primary to-primary-container text-white px-8 py-3 rounded-full font-semibold text-center w-full md:w-auto shadow-sm hover:opacity-90 transition-opacity">
           + Add Donor
@@ -87,7 +96,7 @@ export default function DonorsList() {
         <Search className="text-secondary ml-3" size={24} />
         <input 
           type="text" 
-          placeholder="Search by name, blood group, or phone..." 
+          placeholder="Search by Name, Blood Group, Contact, or CNIC..." 
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="flex-1 bg-transparent border-none outline-none focus:ring-0 text-lg p-2 font-medium placeholder:text-secondary/50 text-on-surfacemain"
@@ -95,7 +104,7 @@ export default function DonorsList() {
       </div>
 
       {/* Filters & Export */}
-      <div className="bg-surface-lowest shadow-[0_4px_24px_rgba(26,28,28,0.04)] rounded-2xl p-4 mb-10 flex flex-col md:flex-row items-end gap-4">
+      <div className="bg-surface-lowest shadow-[0_4px_24px_rgba(26,28,28,0.04)] rounded-2xl p-4 mb-10 flex flex-col md:flex-row items-end gap-4 border border-surface-container">
         <div className="flex-1 w-full space-y-1">
            <label className="text-xs font-semibold text-secondary uppercase tracking-wider">Blood Group</label>
            <select 
@@ -128,22 +137,25 @@ export default function DonorsList() {
 
       <div className="space-y-6">
         {filtered.map(donor => (
-          <div key={donor.id} className="bg-surface-lowest shadow-[0_4px_24px_rgba(26,28,28,0.04)] rounded-tl-[1.5rem] rounded-r-lg rounded-bl-lg p-6 flex flex-col md:flex-row gap-6 md:items-center group">
+          <div key={donor.id} className="bg-surface-lowest shadow-[0_4px_24px_rgba(26,28,28,0.04)] rounded-tl-[1.5rem] rounded-r-lg rounded-bl-lg p-6 flex flex-col md:flex-row gap-6 md:items-center group border border-transparent">
             {/* Blood Type Badge */}
             <div className="shrink-0 w-16 h-16 bg-primary-fixed rounded-2xl flex items-center justify-center">
-              <span className="text-primary font-display font-bold text-2xl">{donor.blood_group}</span>
+              <span className="text-primary font-display font-medium text-2xl tracking-tighter">{donor.blood_group}</span>
             </div>
             
             <div className="flex-1">
-              <h3 className="text-title-lg font-semibold text-on-surfacemain">{donor.name}</h3>
-              <p className="text-secondary text-sm mt-1">{donor.phone} • {donor.age || 'N/A'} yrs • {donor.gender}</p>
+              <h3 className="text-title-lg font-bold text-on-surfacemain">{donor.name}</h3>
+              <p className="text-secondary text-sm mt-1 font-medium">
+                {donor.fathers_name ? `S/O D/O ${donor.fathers_name} • ` : ''} 
+                {donor.contact_no || donor.phone} • {donor.cnic ? `CNIC: ${donor.cnic} • ` : ''} {donor.age ? `${donor.age} yrs` : ''}
+              </p>
               
-              <div className="mt-3 flex flex-wrap gap-4 text-sm">
+              <div className="mt-3 flex flex-wrap gap-4 text-xs font-semibold">
                 {donor.last_donation_date && (
-                   <span className="flex items-center gap-1 text-secondary bg-surface-low px-3 py-1 rounded-full"><Calendar size={14}/> Last: {donor.last_donation_date}</span>
+                   <span className="flex items-center gap-1.5 text-secondary bg-surface-low px-3 py-1.5 rounded-full"><Calendar size={14}/> Last: {donor.last_donation_date}</span>
                 )}
                 {donor.next_eligible_date && (
-                   <span className="flex items-center gap-1 text-primary bg-primary-fixed px-3 py-1 rounded-full"><Calendar size={14}/> Eligible: {donor.next_eligible_date}</span>
+                   <span className="flex items-center gap-1.5 text-primary bg-primary-fixed px-3 py-1.5 rounded-full"><Calendar size={14}/> Eligible: {donor.next_eligible_date}</span>
                 )}
               </div>
             </div>
@@ -155,7 +167,7 @@ export default function DonorsList() {
                    e.preventDefault();
                  }
                }}
-               className="shrink-0 bg-surface-high hover:bg-[#e0e0e0] text-secondary p-3 rounded-full transition-colors flex flex-col items-center justify-center gap-1 text-xs font-semibold"
+               className="shrink-0 bg-surface-high hover:bg-[#e0e0e0] text-secondary p-3 rounded-full transition-colors flex flex-col items-center justify-center gap-1 text-xs font-semibold border border-transparent hover:border-surface-container"
              >
                <Edit2 size={16} /> Edit
              </Link>
@@ -164,7 +176,7 @@ export default function DonorsList() {
 
         {filtered.length === 0 && (
           <div className="bg-surface-lowest rounded-tl-2xl rounded-r-lg rounded-bl-lg py-20 text-center text-secondary shadow-[0_4px_24px_rgba(26,28,28,0.04)]">
-            <p className="text-lg">No donors found.</p>
+            <p className="text-lg font-medium">No donors found. Check exact database entries.</p>
           </div>
         )}
       </div>

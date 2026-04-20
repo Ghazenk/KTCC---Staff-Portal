@@ -1,27 +1,33 @@
-create table if not exists donors (
-  id uuid default gen_random_uuid() primary key,
-  name text not null,
-  phone text not null,
-  blood_group text not null,
-  age integer,
-  gender text,
-  address text,
-  notes text,
-  last_donation_date date,
-  next_eligible_date date,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+-- KTCC Thalassemia Care Center - Database Schema
+
+CREATE TABLE donors (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    name TEXT NOT NULL,
+    fathers_name TEXT,
+    age INT,
+    gender TEXT,
+    contact_no TEXT,
+    cnic TEXT,
+    address TEXT,
+    blood_group TEXT,
+    weight NUMERIC,
+    last_donation_date DATE,
+    next_eligible_date DATE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
-create table if not exists patients (
-  id uuid default gen_random_uuid() primary key,
-  name text not null,
-  guardian_phone text not null,
-  blood_group text not null,
-  age integer,
-  gender text,
-  address text,
-  notes text,
-  last_transfusion_date date,
-  next_transfusion_date date,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+CREATE TABLE patients (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    s_no SERIAL, -- Auto-generated Sequence Number
+    name TEXT NOT NULL,
+    fathers_name TEXT,
+    cnic TEXT,
+    fathers_cnic TEXT,
+    contact_no TEXT,
+    address TEXT,
+    blood_group TEXT,
+    issue_date DATE,
+    last_transfusion_date DATE,
+    next_transfusion_date DATE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
