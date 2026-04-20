@@ -4,10 +4,10 @@ import { ArrowLeft, Mail, Code } from "lucide-react";
 
 export default function CreatorsPage() {
   const creators = [
-    { name: "Ghazen Khalid", email: "1109193@stud.uot.edu.pk", image: "/images/ghazen.jpeg" },
-    { name: "Mairaj Javed", email: "1109159@stud.uot.edu.pk", image: "/images/mairaj.jpeg" },
-    { name: "Aman", email: "1110325@stud.uot.edu.pk", image: "/images/aman.jpeg" },
-    { name: "Meer Miras", email: "1110584@stud.uot.edu.pk", image: "/images/Meer Miras.jpeg" },
+    { name: "Ghazen Khalid", email: "1109193@stud.uot.edu.pk", image: "/assets/ghazen.jpeg" },
+    { name: "Mairaj Javed", email: "1109159@stud.uot.edu.pk", image: "/assets/mairaj.jpeg" },
+    { name: "Aman", email: "1110325@stud.uot.edu.pk", image: "/assets/aman.jpeg" },
+    { name: "Meer Miras", email: "1110584@stud.uot.edu.pk", image: "/assets/Meer Miras.jpeg" },
   ];
 
   return (
