@@ -8,6 +8,10 @@ const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' });
 export const metadata: Metadata = {
   title: 'KTCC (Kech Thalassemia Care Center)',
   description: 'Data entry portal for KTCC records.',
+  icons: {
+    icon: '/images/logo.png',
+    apple: '/images/logo.png',
+  },
 };
 
 export default function RootLayout({children}: {children: React.ReactNode}) {

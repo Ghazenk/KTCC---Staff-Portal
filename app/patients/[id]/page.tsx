@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Users, Save } from 'lucide-react';
+import { ArrowLeft, Users, Save, Activity } from 'lucide-react';
 
 export default function PatientFormPage() {
   const router = useRouter();
@@ -15,6 +15,7 @@ export default function PatientFormPage() {
   const [fetching, setFetching] = useState(isEditing);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [history, setHistory] = useState<any[]>([]);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -31,25 +32,35 @@ export default function PatientFormPage() {
 
   useEffect(() => {
     if (isEditing) {
-      const loadPatient = async () => {
-        const { data, error } = await supabase.from('patients').select('*').eq('id', idStr).single();
-        if (data) {
+      const loadData = async () => {
+        const { data: patientData } = await supabase.from('patients').select('*').eq('id', idStr).single();
+        if (patientData) {
           setFormData({
-            name: data.name || '',
-            fathers_name: data.fathers_name || '',
-            cnic: data.cnic || '',
-            fathers_cnic: data.fathers_cnic || '',
-            contact_no: data.contact_no || data.guardian_phone || '', // backward compat mapping
-            address: data.address || '',
-            blood_group: data.blood_group || 'O+',
-            issue_date: data.issue_date || '',
-            last_transfusion_date: data.last_transfusion_date || '',
-            next_transfusion_date: data.next_transfusion_date || ''
+            name: patientData.name || '',
+            fathers_name: patientData.fathers_name || '',
+            cnic: patientData.cnic || '',
+            fathers_cnic: patientData.fathers_cnic || '',
+            contact_no: patientData.contact_no || patientData.guardian_phone || '', 
+            address: patientData.address || '',
+            blood_group: patientData.blood_group || 'O+',
+            issue_date: patientData.issue_date || '',
+            last_transfusion_date: patientData.last_transfusion_date || '',
+            next_transfusion_date: patientData.next_transfusion_date || ''
           });
         }
+        
+        // Fetch History
+        const { data: historyData } = await supabase
+          .from('transfusion_history')
+          .select('*')
+          .eq('patient_id', idStr)
+          .order('transfusion_date', { ascending: false });
+          
+        if (historyData) setHistory(historyData);
+        
         setFetching(false);
       };
-      loadPatient();
+      loadData();
     }
   }, [idStr, isEditing]);
 
@@ -124,8 +135,8 @@ export default function PatientFormPage() {
   if (fetching) return <div className="p-12 text-center text-secondary">Loading...</div>;
 
   return (
-    <main className="max-w-4xl mx-auto p-6 pt-12">
-      <Link href="/patients" className="inline-flex items-center gap-2 text-secondary mb-8 hover:text-primary transition-colors font-medium">
+    <main className="max-w-4xl mx-auto p-6 pt-12 space-y-8">
+      <Link href="/patients" className="inline-flex items-center gap-2 text-secondary hover:text-primary transition-colors font-medium">
         <ArrowLeft size={20} /> Back to Directory
       </Link>
       
@@ -137,10 +148,10 @@ export default function PatientFormPage() {
             </div>
             <div>
               <h1 className="text-display-sm md:text-3xl font-display font-medium text-on-surfacemain">
-                {isEditing ? 'Edit Patient' : 'Add New Patient'}
+                {isEditing ? 'Patient Profile' : 'Add New Patient'}
               </h1>
               <p className="text-secondary text-lg mt-1 font-medium">
-                {isEditing ? 'Update exact patient data' : 'Register a new patient record'}
+                {isEditing ? 'Manage patient data and history' : 'Register a new patient record'}
               </p>
             </div>
           </div>
@@ -232,6 +243,42 @@ export default function PatientFormPage() {
           </div>
         </form>
       </div>
+
+      {isEditing && (
+        <div className="bg-surface-lowest shadow-[0_4px_24px_rgba(26,28,28,0.04)] rounded-2xl p-8 md:p-10 mb-8">
+          <div className="flex items-center gap-3 mb-6">
+            <Activity className="text-tertiary" size={24} />
+            <h2 className="text-2xl font-bold text-on-surfacemain">Transfusion History</h2>
+          </div>
+          
+          {history.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b-2 border-surface-container text-secondary text-sm">
+                    <th className="pb-3 pr-4 font-semibold">Date</th>
+                    <th className="pb-3 pr-4 font-semibold">Blood Bag ID</th>
+                    <th className="pb-3 font-semibold">Donor Used</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.map((record) => (
+                    <tr key={record.id} className="border-b border-surface-container hover:bg-surface-main/50 transition-colors">
+                      <td className="py-4 pr-4 font-medium">{record.transfusion_date || 'N/A'}</td>
+                      <td className="py-4 pr-4 text-tertiary font-medium">{record.blood_bag_id || '-'}</td>
+                      <td className="py-4 font-medium">{record.donor_used || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-secondary bg-surface-main rounded-xl">
+              <p className="font-medium">No transfusion history recorded yet.</p>
+            </div>
+          )}
+        </div>
+      )}
     </main>
   );
 }
