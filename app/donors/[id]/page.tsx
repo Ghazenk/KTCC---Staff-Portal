@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, UserPlus, Save, Activity } from 'lucide-react';
+import { ArrowLeft, UserPlus, Save, Activity, Trash2 } from 'lucide-react';
 
 export default function DonorFormPage() {
   const router = useRouter();
@@ -71,11 +71,38 @@ export default function DonorFormPage() {
   const validate = (data: typeof formData) => {
     let errs: Record<string, string> = {};
     if (!data.name?.trim()) errs.name = "Name is required";
-    if (!data.contact_no?.trim()) errs.contact_no = "Contact No is required";
+    
+    // Strict Pakistani Phone Number format (e.g. 03001234567 or 0300-1234567 or 0300 1234567)
+    const phoneRegex = /^03\d{2}[-\s]?\d{7}$/;
+    if (!data.contact_no?.trim()) {
+      errs.contact_no = "Contact No is required";
+    } else if (!phoneRegex.test(data.contact_no.trim())) {
+      errs.contact_no = "Invalid format. Use 11 digit format: 03XX XXXXXXX";
+    }
+
+    // Strict CNIC format: 00000-0000000-0
+    const cnicRegex = /^\d{5}-\d{7}-\d{1}$/;
+    if (data.cnic?.trim() && !cnicRegex.test(data.cnic.trim())) {
+      errs.cnic = "Invalid CNIC. Exact format required: 00000-0000000-0";
+    }
+
     if (data.age && (parseInt(data.age) <= 0 || parseInt(data.age) > 120)) errs.age = "Enter a valid age";
     if (data.weight && (parseFloat(data.weight) <= 0)) errs.weight = "Enter a valid weight";
     if (!data.address?.trim()) errs.address = "Address is required";
+    
     return errs;
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm('CRITICAL ALERT:\nAre you sure you want to completely delete this donor? This action cannot be undone and will permanently wipe their history.')) return;
+    setLoading(true);
+    const { error } = await supabase.from('donors').delete().eq('id', idStr);
+    setLoading(false);
+    if (error) {
+      alert(`Error deleting record: ${error.message}`);
+    } else {
+      router.push('/donors');
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -193,8 +220,9 @@ export default function DonorFormPage() {
             <div className="space-y-2">
               <label className="text-sm font-semibold text-on-surfacemain">CNIC</label>
               <input name="cnic" value={formData.cnic} onChange={handleChange}
-                className="w-full bg-surface-container rounded-xl p-4 focus:bg-primary-fixed focus:outline-none transition-colors border-transparent ring-0 placeholder:text-secondary/50 text-on-surfacemain"
+                className={`w-full bg-surface-container rounded-xl p-4 focus:outline-none transition-colors border-transparent placeholder:text-secondary/50 text-on-surfacemain ${errors.cnic ? 'ring-2 ring-tertiary bg-tertiary-container/30' : 'focus:bg-primary-fixed ring-0'}`}
                 placeholder="e.g. 00000-0000000-0" />
+              {errors.cnic && <p className="text-tertiary text-xs font-semibold">{errors.cnic}</p>}
             </div>
           </div>
 
@@ -263,9 +291,19 @@ export default function DonorFormPage() {
             {errors.address && <p className="text-tertiary text-xs font-semibold">{errors.address}</p>}
           </div>
 
-          <div className="pt-6 flex flex-col items-end gap-2">
+          <div className="pt-6 flex flex-col sm:flex-row items-center justify-end gap-4">
+            {isEditing && (
+              <button 
+                disabled={loading} 
+                type="button"
+                onClick={handleDelete}
+                className="w-full sm:w-auto px-6 py-4 bg-tertiary-container/30 text-tertiary rounded-full font-semibold hover:bg-tertiary-container transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                <Trash2 size={20} /> Delete Donor
+              </button>
+            )}
             <button disabled={loading} type="submit"
-              className="px-10 py-4 bg-gradient-to-r from-primary to-primary-container text-white rounded-full font-semibold shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50 min-w-[200px]">
+              className="w-full sm:w-auto px-10 py-4 bg-gradient-to-r from-primary to-primary-container text-white rounded-full font-semibold shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50 min-w-[200px]">
               {loading ? 'Saving...' : (isEditing ? 'Update Donor' : 'Save Donor')}
             </button>
           </div>

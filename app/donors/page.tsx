@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Search, Calendar, Edit2, Download } from 'lucide-react';
+import { ArrowLeft, Search, Calendar, Edit2, Download, Trash2 } from 'lucide-react';
 
 export default function DonorsList() {
   const router = useRouter();
@@ -14,6 +14,18 @@ export default function DonorsList() {
   const [filterBloodGroup, setFilterBloodGroup] = useState('');
   const [filterFromDate, setFilterFromDate] = useState('');
   const [filterToDate, setFilterToDate] = useState('');
+
+  const handleDeleteDonor = async (id: string, name: string) => {
+    if (!window.confirm(`CRITICAL ALERT:\nAre you sure you want to permanently delete donor "${name}"?\nThis action cannot be undone.`)) return;
+    
+    // Optimistic UI update or refresh
+    const { error } = await supabase.from('donors').delete().eq('id', id);
+    if (error) {
+      alert(`Error deleting donor: ${error.message}`);
+    } else {
+      setDonors(prev => prev.filter(d => d.id !== id));
+    }
+  };
 
   useEffect(() => {
     fetchDonors();
@@ -52,12 +64,12 @@ export default function DonorsList() {
       return `"${String(str).replace(/"/g, '""')}"`;
     };
 
-    const headers = ["ID", "Name", "Father's Name", "Age", "Gender", "Contact No", "CNIC", "Blood Group", "Weight", "Last Donation Date", "Next Eligible Date", "Address"];
+    const headers = ["ID", "Name", "Father's Name", "Age", "Gender", "Contact No", "CNIC", "Blood Group", "Weight", "Status", "Last Donation Date", "Next Eligible Date", "Address"];
     const csvRows = [headers.join(",")];
     
     for (const d of filtered) {
       const row = [
-        d.id, d.name, d.fathers_name, d.age, d.gender, d.contact_no || d.phone, d.cnic, d.blood_group, d.weight, d.last_donation_date, d.next_eligible_date, d.address
+        d.id, d.name, d.fathers_name, d.age, d.gender, d.contact_no || d.phone, d.cnic, d.blood_group, d.weight, d.status || 'Pending', d.last_donation_date, d.next_eligible_date, d.address
       ].map(escapeCSV);
       csvRows.push(row.join(","));
     }
@@ -119,14 +131,14 @@ export default function DonorsList() {
            </select>
         </div>
         <div className="flex-1 w-full space-y-1">
-           <label className="text-xs font-semibold text-secondary uppercase tracking-wider">Last Donation (From)</label>
-           <input type="date" value={filterFromDate} onChange={e => setFilterFromDate(e.target.value)}
-             className="w-full bg-surface-container rounded-lg p-3 text-sm focus:outline-none focus:ring-2 ring-primary/20 border-transparent text-on-surfacemain" />
-        </div>
-        <div className="flex-1 w-full space-y-1">
-           <label className="text-xs font-semibold text-secondary uppercase tracking-wider">Last Donation (To)</label>
-           <input type="date" value={filterToDate} onChange={e => setFilterToDate(e.target.value)}
-             className="w-full bg-surface-container rounded-lg p-3 text-sm focus:outline-none focus:ring-2 ring-primary/20 border-transparent text-on-surfacemain" />
+           <label className="text-xs font-semibold text-secondary uppercase tracking-wider">Date Range (Last Donation)</label>
+           <div className="flex items-center gap-2">
+             <input type="date" value={filterFromDate} onChange={e => setFilterFromDate(e.target.value)} title="From Date"
+               className="w-full bg-surface-container rounded-lg p-3 text-sm focus:outline-none focus:ring-2 ring-primary/20 border-transparent text-on-surfacemain" />
+             <span className="text-secondary font-medium">to</span>
+             <input type="date" value={filterToDate} onChange={e => setFilterToDate(e.target.value)} title="To Date"
+               className="w-full bg-surface-container rounded-lg p-3 text-sm focus:outline-none focus:ring-2 ring-primary/20 border-transparent text-on-surfacemain" />
+           </div>
         </div>
         <div className="shrink-0 w-full md:w-auto">
           <button onClick={exportCSV} className="w-full flex items-center justify-center gap-2 bg-surface-high hover:bg-[#e0e0e0] text-secondary font-semibold py-3 px-6 rounded-lg transition-colors">
@@ -160,17 +172,27 @@ export default function DonorsList() {
               </div>
             </div>
 
-             <Link 
-               href={`/donors/${donor.id}`} 
-               onClick={(e) => {
-                 if (!window.confirm('Are you sure you want to edit this record?')) {
-                   e.preventDefault();
-                 }
-               }}
-               className="shrink-0 bg-surface-high hover:bg-[#e0e0e0] text-secondary p-3 rounded-full transition-colors flex flex-col items-center justify-center gap-1 text-xs font-semibold border border-transparent hover:border-surface-container"
-             >
-               <Edit2 size={16} /> Edit
-             </Link>
+             <div className="shrink-0 flex items-center gap-2">
+               <Link 
+                 href={`/donors/${donor.id}`} 
+                 onClick={(e) => {
+                   if (!window.confirm('Are you sure you want to edit this record?')) {
+                     e.preventDefault();
+                   }
+                 }}
+                 className="bg-surface-high hover:bg-[#e0e0e0] text-secondary p-3 rounded-full transition-colors flex flex-col items-center justify-center gap-1 text-xs font-semibold border border-transparent hover:border-surface-container"
+               >
+                 <Edit2 size={16} /> Edit
+               </Link>
+               
+               <button 
+                 onClick={() => handleDeleteDonor(donor.id, donor.name)}
+                 className="bg-surface-high hover:bg-tertiary-container text-tertiary hover:text-tertiary p-3 rounded-full transition-colors flex flex-col items-center justify-center gap-1 text-xs font-semibold border border-transparent hover:border-surface-container"
+                 title="Delete Donor"
+               >
+                 <Trash2 size={16} /> Delete
+               </button>
+             </div>
           </div>
         ))}
 

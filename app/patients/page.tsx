@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Search, Calendar, Edit2, Download } from 'lucide-react';
+import { ArrowLeft, Search, Calendar, Edit2, Download, Trash2 } from 'lucide-react';
 
 export default function PatientsList() {
   const router = useRouter();
@@ -14,6 +14,17 @@ export default function PatientsList() {
   const [filterBloodGroup, setFilterBloodGroup] = useState('');
   const [filterFromDate, setFilterFromDate] = useState('');
   const [filterToDate, setFilterToDate] = useState('');
+
+  const handleDeletePatient = async (id: string, name: string) => {
+    if (!window.confirm(`CRITICAL ALERT:\nAre you sure you want to permanently delete patient "${name}"?\nThis action cannot be undone.`)) return;
+    
+    const { error } = await supabase.from('patients').delete().eq('id', id);
+    if (error) {
+      alert(`Error deleting patient: ${error.message}`);
+    } else {
+      setPatients(prev => prev.filter(p => p.id !== id));
+    }
+  };
 
   useEffect(() => {
     fetchPatients();
@@ -121,14 +132,14 @@ export default function PatientsList() {
            </select>
         </div>
         <div className="flex-1 w-full space-y-1">
-           <label className="text-xs font-semibold text-secondary uppercase tracking-wider">Last Trans. (From)</label>
-           <input type="date" value={filterFromDate} onChange={e => setFilterFromDate(e.target.value)}
-             className="w-full bg-surface-container rounded-lg p-3 text-sm focus:outline-none focus:ring-2 ring-primary/20 border-transparent text-on-surfacemain" />
-        </div>
-        <div className="flex-1 w-full space-y-1">
-           <label className="text-xs font-semibold text-secondary uppercase tracking-wider">Last Trans. (To)</label>
-           <input type="date" value={filterToDate} onChange={e => setFilterToDate(e.target.value)}
-             className="w-full bg-surface-container rounded-lg p-3 text-sm focus:outline-none focus:ring-2 ring-primary/20 border-transparent text-on-surfacemain" />
+           <label className="text-xs font-semibold text-secondary uppercase tracking-wider">Date Range (Last Transfusion)</label>
+           <div className="flex items-center gap-2">
+             <input type="date" value={filterFromDate} onChange={e => setFilterFromDate(e.target.value)} title="From Date"
+               className="w-full bg-surface-container rounded-lg p-3 text-sm focus:outline-none focus:ring-2 ring-primary/20 border-transparent text-on-surfacemain" />
+             <span className="text-secondary font-medium">to</span>
+             <input type="date" value={filterToDate} onChange={e => setFilterToDate(e.target.value)} title="To Date"
+               className="w-full bg-surface-container rounded-lg p-3 text-sm focus:outline-none focus:ring-2 ring-primary/20 border-transparent text-on-surfacemain" />
+           </div>
         </div>
         <div className="shrink-0 w-full md:w-auto">
           <button onClick={exportCSV} className="w-full flex items-center justify-center gap-2 bg-surface-high hover:bg-[#e0e0e0] text-secondary font-semibold py-3 px-6 rounded-lg transition-colors">
@@ -163,17 +174,27 @@ export default function PatientsList() {
               </div>
             </div>
 
-            <Link 
-              href={`/patients/${patient.id}`} 
-              onClick={(e) => {
-                 if (!window.confirm('Are you sure you want to edit this patient record?')) {
-                   e.preventDefault();
-                 }
-              }}
-              className="shrink-0 bg-surface-high hover:bg-[#e0e0e0] text-secondary p-3 rounded-full transition-colors flex flex-col items-center justify-center gap-1 text-xs font-semibold border border-transparent hover:border-surface-container"
-            >
-               <Edit2 size={16} /> Edit
-            </Link>
+            <div className="shrink-0 flex items-center gap-2">
+              <Link 
+                href={`/patients/${patient.id}`} 
+                onClick={(e) => {
+                   if (!window.confirm('Are you sure you want to edit this patient record?')) {
+                     e.preventDefault();
+                   }
+                }}
+                className="bg-surface-high hover:bg-[#e0e0e0] text-secondary p-3 rounded-full transition-colors flex flex-col items-center justify-center gap-1 text-xs font-semibold border border-transparent hover:border-surface-container"
+              >
+                 <Edit2 size={16} /> Edit
+              </Link>
+              
+              <button 
+                 onClick={() => handleDeletePatient(patient.id, patient.name)}
+                 className="bg-surface-high hover:bg-tertiary-container text-tertiary hover:text-tertiary p-3 rounded-full transition-colors flex flex-col items-center justify-center gap-1 text-xs font-semibold border border-transparent hover:border-surface-container"
+                 title="Delete Patient"
+              >
+                 <Trash2 size={16} /> Delete
+              </button>
+            </div>
           </div>
         ))}
 
