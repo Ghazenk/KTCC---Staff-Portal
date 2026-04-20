@@ -72,8 +72,8 @@ export default function DonorFormPage() {
     let errs: Record<string, string> = {};
     if (!data.name?.trim()) errs.name = "Name is required";
     if (!data.contact_no?.trim()) errs.contact_no = "Contact No is required";
-    if (data.age && (parseInt(data.age) <= 0 || parseInt(data.age) > 120)) errs.age = "Enter a valid age";
-    if (data.weight && (parseFloat(data.weight) <= 0)) errs.weight = "Enter a valid weight";
+    if (data.age && (parseInt(data.age) < 18 || parseInt(data.age) > 65)) errs.age = "Donor must be between 18 and 65 years old";
+    if (data.weight && (parseFloat(data.weight) < 50)) errs.weight = "Minimum weight constraint is 50kg";
     if (!data.address?.trim()) errs.address = "Address is required";
     return errs;
   };
