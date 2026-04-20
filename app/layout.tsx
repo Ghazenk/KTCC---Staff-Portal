@@ -9,8 +9,8 @@ export const metadata: Metadata = {
   title: 'KTCC (Kech Thalassemia Care Center)',
   description: 'Data entry portal for KTCC records.',
   icons: {
-    icon: '/images/logo.png',
-    apple: '/images/logo.png',
+    icon: '/images/logo.png?v=2',
+    apple: '/images/logo.png?v=2',
   },
 };
 
