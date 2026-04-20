@@ -38,10 +38,11 @@ export default function CreatorsPage() {
             <div className="flex items-center gap-6">
               <div className="relative w-20 h-20 shrink-0 rounded-2xl overflow-hidden shadow-inner bg-surface-container">
                 {/* Fallback to standard img tag to safely render mocked image uploads */}
-                <img 
+                <Image 
                   src={creator.image} 
                   alt={creator.name}
-                  className="w-full h-full object-cover"
+                  fill
+                  className="object-cover"
                 />
               </div>
               <div>

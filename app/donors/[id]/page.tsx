@@ -32,6 +32,16 @@ export default function DonorFormPage() {
     next_eligible_date: ''
   });
 
+  const [newDonation, setNewDonation] = useState({
+    donation_date: new Date().toISOString().split('T')[0],
+    blood_bag_id: '',
+    vitals_hb: '',
+    vitals_bp: '',
+    vitals_pulse: '',
+    vitals_temp: ''
+  });
+  const [submittingDonation, setSubmittingDonation] = useState(false);
+
   useEffect(() => {
     if (isEditing) {
       const loadData = async () => {
@@ -67,6 +77,21 @@ export default function DonorFormPage() {
       loadData();
     }
   }, [idStr, isEditing]);
+
+  // Auto-calculate Next Eligible Date
+  useEffect(() => {
+    if (formData.last_donation_date) {
+      const lastDate = new Date(formData.last_donation_date);
+      if (!isNaN(lastDate.getTime())) {
+        const monthsToAdd = formData.gender === 'Female' ? 6 : 3;
+        lastDate.setMonth(lastDate.getMonth() + monthsToAdd);
+        const nextEligibleStr = lastDate.toISOString().split('T')[0];
+        if (nextEligibleStr !== formData.next_eligible_date) {
+          setFormData(prev => ({ ...prev, next_eligible_date: nextEligibleStr }));
+        }
+      }
+    }
+  }, [formData.last_donation_date, formData.gender]);
 
   const validate = (data: typeof formData) => {
     let errs: Record<string, string> = {};
@@ -167,6 +192,32 @@ export default function DonorFormPage() {
     }
   };
 
+  const handleNewDonationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDonation.donation_date) return alert("Donation date is required.");
+    
+    setSubmittingDonation(true);
+    const payload = { ...newDonation, donor_id: idStr };
+    const { data, error } = await supabase.from('donation_history').insert([payload]).select().single();
+    
+    if (error) {
+      alert(`Error saving donation: ${error.message}`);
+    } else if (data) {
+      setHistory(prev => [data, ...prev]);
+      setNewDonation({
+        donation_date: new Date().toISOString().split('T')[0],
+        blood_bag_id: '',
+        vitals_hb: '',
+        vitals_bp: '',
+        vitals_pulse: '',
+        vitals_temp: ''
+      });
+      // Optionally sync this closely with last_donation_date logic
+      setFormData(prev => ({ ...prev, last_donation_date: data.donation_date }));
+    }
+    setSubmittingDonation(false);
+  };
+
   if (fetching) return <div className="p-12 text-center text-secondary">Loading...</div>;
 
   return (
@@ -202,7 +253,7 @@ export default function DonorFormPage() {
               {errors.name && <p className="text-tertiary text-xs font-semibold">{errors.name}</p>}
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-on-surfacemain">Father's Name</label>
+              <label className="text-sm font-semibold text-on-surfacemain">Father&apos;s Name</label>
               <input name="fathers_name" value={formData.fathers_name} onChange={handleChange}
                 className="w-full bg-surface-container rounded-xl p-4 focus:bg-primary-fixed focus:outline-none transition-colors border-transparent ring-0 placeholder:text-secondary/50 text-on-surfacemain"
                 placeholder="Father's Name" />
@@ -317,6 +368,48 @@ export default function DonorFormPage() {
             <h2 className="text-2xl font-bold text-on-surfacemain">Donation History</h2>
           </div>
           
+          <form onSubmit={handleNewDonationSubmit} className="bg-surface-main p-6 rounded-xl mb-8 space-y-4">
+            <h3 className="font-semibold text-on-surfacemain mb-2">Record New Donation</h3>
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+              <div className="space-y-1 lg:col-span-1">
+                <label className="text-xs font-semibold text-secondary">Date</label>
+                <input type="date" required value={newDonation.donation_date} onChange={e => setNewDonation({...newDonation, donation_date: e.target.value})}
+                  className="w-full bg-surface-container rounded-lg p-3 text-sm focus:outline-none focus:ring-2 ring-primary/20 text-on-surfacemain" />
+              </div>
+              <div className="space-y-1 lg:col-span-1">
+                <label className="text-xs font-semibold text-secondary">Bag ID</label>
+                <input type="text" placeholder="Bag ID" value={newDonation.blood_bag_id} onChange={e => setNewDonation({...newDonation, blood_bag_id: e.target.value})}
+                  className="w-full bg-surface-container rounded-lg p-3 text-sm focus:outline-none focus:ring-2 ring-primary/20 text-on-surfacemain" />
+              </div>
+              <div className="space-y-1 lg:col-span-1">
+                <label className="text-xs font-semibold text-secondary">HB</label>
+                <input type="number" step="0.1" placeholder="HB" value={newDonation.vitals_hb} onChange={e => setNewDonation({...newDonation, vitals_hb: e.target.value})}
+                  className="w-full bg-surface-container rounded-lg p-3 text-sm focus:outline-none focus:ring-2 ring-primary/20 text-on-surfacemain" />
+              </div>
+              <div className="space-y-1 lg:col-span-1">
+                <label className="text-xs font-semibold text-secondary">BP</label>
+                <input type="text" placeholder="120/80" value={newDonation.vitals_bp} onChange={e => setNewDonation({...newDonation, vitals_bp: e.target.value})}
+                  className="w-full bg-surface-container rounded-lg p-3 text-sm focus:outline-none focus:ring-2 ring-primary/20 text-on-surfacemain" />
+              </div>
+              <div className="space-y-1 lg:col-span-1">
+                <label className="text-xs font-semibold text-secondary">Pulse</label>
+                <input type="text" placeholder="BPM" value={newDonation.vitals_pulse} onChange={e => setNewDonation({...newDonation, vitals_pulse: e.target.value})}
+                  className="w-full bg-surface-container rounded-lg p-3 text-sm focus:outline-none focus:ring-2 ring-primary/20 text-on-surfacemain" />
+              </div>
+              <div className="space-y-1 lg:col-span-1">
+                <label className="text-xs font-semibold text-secondary">Temp</label>
+                <input type="text" placeholder="°F/°C" value={newDonation.vitals_temp} onChange={e => setNewDonation({...newDonation, vitals_temp: e.target.value})}
+                  className="w-full bg-surface-container rounded-lg p-3 text-sm focus:outline-none focus:ring-2 ring-primary/20 text-on-surfacemain" />
+              </div>
+            </div>
+            <div className="flex justify-end pt-2">
+              <button disabled={submittingDonation} type="submit"
+                className="px-6 py-2 bg-primary text-white rounded-lg font-semibold shadow-sm hover:opacity-90 disabled:opacity-50 text-sm">
+                {submittingDonation ? 'Adding...' : 'Add Record'}
+              </button>
+            </div>
+          </form>
+
           {history.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">

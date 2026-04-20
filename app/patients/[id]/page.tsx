@@ -30,6 +30,13 @@ export default function PatientFormPage() {
     next_transfusion_date: ''
   });
 
+  const [newTransfusion, setNewTransfusion] = useState({
+    transfusion_date: new Date().toISOString().split('T')[0],
+    blood_bag_id: '',
+    donor_used: ''
+  });
+  const [submittingTransfusion, setSubmittingTransfusion] = useState(false);
+
   useEffect(() => {
     if (isEditing) {
       const loadData = async () => {
@@ -63,6 +70,20 @@ export default function PatientFormPage() {
       loadData();
     }
   }, [idStr, isEditing]);
+
+  // Auto-calculate Next Transfusion Date (15 days cycle)
+  useEffect(() => {
+    if (formData.last_transfusion_date) {
+      const lastDate = new Date(formData.last_transfusion_date);
+      if (!isNaN(lastDate.getTime())) {
+        lastDate.setDate(lastDate.getDate() + 15);
+        const nextTransfusionStr = lastDate.toISOString().split('T')[0];
+        if (nextTransfusionStr !== formData.next_transfusion_date) {
+          setFormData(prev => ({ ...prev, next_transfusion_date: nextTransfusionStr }));
+        }
+      }
+    }
+  }, [formData.last_transfusion_date]);
 
   const validate = (data: typeof formData) => {
     let errs: Record<string, string> = {};
@@ -161,6 +182,29 @@ export default function PatientFormPage() {
     }
   };
 
+  const handleNewTransfusionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTransfusion.transfusion_date) return alert("Transfusion date is required.");
+    
+    setSubmittingTransfusion(true);
+    const payload = { ...newTransfusion, patient_id: idStr };
+    const { data, error } = await supabase.from('transfusion_history').insert([payload]).select().single();
+    
+    if (error) {
+      alert(`Error saving transfusion: ${error.message}`);
+    } else if (data) {
+      setHistory(prev => [data, ...prev]);
+      setNewTransfusion({
+        transfusion_date: new Date().toISOString().split('T')[0],
+        blood_bag_id: '',
+        donor_used: ''
+      });
+      // Sync last transfusion date
+      setFormData(prev => ({ ...prev, last_transfusion_date: data.transfusion_date }));
+    }
+    setSubmittingTransfusion(false);
+  };
+
   if (fetching) return <div className="p-12 text-center text-secondary">Loading...</div>;
 
   return (
@@ -196,7 +240,7 @@ export default function PatientFormPage() {
               {errors.name && <p className="text-tertiary text-xs font-semibold">{errors.name}</p>}
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-on-surfacemain">Father's Name</label>
+              <label className="text-sm font-semibold text-on-surfacemain">Father&apos;s Name</label>
               <input name="fathers_name" value={formData.fathers_name} onChange={handleChange}
                 className="w-full bg-surface-container rounded-xl p-4 focus:bg-primary-fixed focus:outline-none transition-colors border-transparent ring-0 placeholder:text-secondary/50 text-on-surfacemain"
                 placeholder="Father's Name" />
@@ -212,7 +256,7 @@ export default function PatientFormPage() {
               {errors.cnic && <p className="text-tertiary text-xs font-semibold">{errors.cnic}</p>}
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-on-surfacemain">Father's CNIC</label>
+              <label className="text-sm font-semibold text-on-surfacemain">Father&apos;s CNIC</label>
               <input name="fathers_cnic" value={formData.fathers_cnic} onChange={handleChange}
                 className={`w-full bg-surface-container rounded-xl p-4 focus:outline-none transition-colors border-transparent placeholder:text-secondary/50 text-on-surfacemain ${errors.fathers_cnic ? 'ring-2 ring-tertiary bg-tertiary-container/30' : 'focus:bg-primary-fixed ring-0'}`}
                 placeholder="Father's CNIC" />
@@ -291,6 +335,33 @@ export default function PatientFormPage() {
             <Activity className="text-tertiary" size={24} />
             <h2 className="text-2xl font-bold text-on-surfacemain">Transfusion History</h2>
           </div>
+
+          <form onSubmit={handleNewTransfusionSubmit} className="bg-surface-main p-6 rounded-xl mb-8 space-y-4">
+            <h3 className="font-semibold text-on-surfacemain mb-2">Record New Transfusion</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-secondary">Date</label>
+                <input type="date" required value={newTransfusion.transfusion_date} onChange={e => setNewTransfusion({...newTransfusion, transfusion_date: e.target.value})}
+                  className="w-full bg-surface-container rounded-lg p-3 text-sm focus:outline-none focus:ring-2 ring-tertiary/20 text-on-surfacemain" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-secondary">Blood Bag ID</label>
+                <input type="text" placeholder="Bag ID" value={newTransfusion.blood_bag_id} onChange={e => setNewTransfusion({...newTransfusion, blood_bag_id: e.target.value})}
+                  className="w-full bg-surface-container rounded-lg p-3 text-sm focus:outline-none focus:ring-2 ring-tertiary/20 text-on-surfacemain" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-secondary">Donor Used</label>
+                <input type="text" placeholder="Donor Info" value={newTransfusion.donor_used} onChange={e => setNewTransfusion({...newTransfusion, donor_used: e.target.value})}
+                  className="w-full bg-surface-container rounded-lg p-3 text-sm focus:outline-none focus:ring-2 ring-tertiary/20 text-on-surfacemain" />
+              </div>
+            </div>
+            <div className="flex justify-end pt-2">
+              <button disabled={submittingTransfusion} type="submit"
+                className="px-6 py-2 bg-gradient-to-r from-tertiary to-tertiary-container text-white rounded-lg font-semibold shadow-sm hover:opacity-90 disabled:opacity-50 text-sm">
+                {submittingTransfusion ? 'Adding...' : 'Add Record'}
+              </button>
+            </div>
+          </form>
           
           {history.length > 0 ? (
             <div className="overflow-x-auto">

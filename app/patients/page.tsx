@@ -1,14 +1,18 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Search, Calendar, Edit2, Download, Trash2 } from 'lucide-react';
+import { ArrowLeft, Search, Calendar, Edit2, Download, Trash2, Upload, Filter, X } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 export default function PatientsList() {
   const router = useRouter();
   const [patients, setPatients] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   // Filters
   const [filterBloodGroup, setFilterBloodGroup] = useState('');
@@ -26,10 +30,6 @@ export default function PatientsList() {
     }
   };
 
-  useEffect(() => {
-    fetchPatients();
-  }, []);
-
   const fetchPatients = async () => {
     const { data, error } = await supabase.from('patients').select('*').order('created_at', { ascending: false });
     if (error) {
@@ -37,6 +37,10 @@ export default function PatientsList() {
     }
     if (data) setPatients(data);
   };
+
+  useEffect(() => {
+    fetchPatients();
+  }, []);
 
   const filtered = patients.filter(p => {
     const safeName = p.name || '';
@@ -58,6 +62,7 @@ export default function PatientsList() {
   });
 
   const exportCSV = () => {
+    // ... logic remains
     const escapeCSV = (str: any) => {
       if (str === null || str === undefined) return '""';
       return `"${String(str).replace(/"/g, '""')}"`;
@@ -86,6 +91,50 @@ export default function PatientsList() {
     document.body.removeChild(link);
   };
 
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setImporting(true);
+      const dataBuffer = await file.arrayBuffer();
+      const workbook = XLSX.read(dataBuffer, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
+
+      if (!jsonData || jsonData.length === 0) {
+        throw new Error("No data found in the file.");
+      }
+
+      const mappedData = jsonData.map(row => ({
+        name: row['Name'] || '',
+        fathers_name: row["Father's Name"] || row['fathers_name'] || '',
+        cnic: row['CNIC'] || row['cnic'] || '',
+        fathers_cnic: row["Father's CNIC"] || row['fathers_cnic'] || '',
+        contact_no: row['Contact No'] || row['contact_no'] || '',
+        blood_group: row['Blood Group'] || row['blood_group'] || 'O+',
+        address: row['Address'] || row['address'] || '',
+        issue_date: row['Issue Date'] || row['issue_date'] || null,
+        last_transfusion_date: row['Last Transfusion Date'] || row['last_transfusion_date'] || null,
+        next_transfusion_date: row['Next Transfusion Date'] || row['next_transfusion_date'] || null
+      })).filter(d => d.name);
+
+      if (mappedData.length === 0) throw new Error("No valid entries with names found.");
+
+      const { error } = await supabase.from('patients').insert(mappedData);
+      if (error) throw error;
+      
+      alert(`Successfully imported ${mappedData.length} patients!`);
+      fetchPatients();
+    } catch (err: any) {
+      alert(`Import failed: ${err.message}`);
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   return (
     <main className="max-w-4xl mx-auto p-6 pt-12">
       <Link href="/" className="inline-flex items-center gap-2 text-secondary mb-8 hover:text-primary transition-colors font-medium">
@@ -104,20 +153,29 @@ export default function PatientsList() {
         </Link>
       </header>
 
-      {/* Search Bar */}
-      <div className="bg-surface-lowest shadow-[0_4px_24px_rgba(26,28,28,0.04)] rounded-tl-2xl rounded-r-lg rounded-bl-lg p-3 mb-6 flex items-center gap-3">
-        <Search className="text-secondary ml-3" size={24} />
-        <input 
-          type="text" 
-          placeholder="Search by Name, CNIC, Blood Group, or Contact No..." 
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="flex-1 bg-transparent border-none outline-none focus:ring-0 text-lg p-2 font-medium placeholder:text-secondary/50 text-on-surfacemain"
-        />
+      {/* Search Bar & Mobile Filter Toggle */}
+      <div className="flex gap-3 mb-6">
+        <div className="flex-1 bg-surface-lowest shadow-[0_4px_24px_rgba(26,28,28,0.04)] rounded-tl-2xl rounded-r-lg rounded-bl-lg p-3 flex items-center gap-3">
+          <Search className="text-secondary ml-3 shrink-0" size={24} />
+          <input 
+            type="text" 
+            placeholder="Search by Name, CNIC, or Contact No..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 w-full bg-transparent border-none outline-none focus:ring-0 text-lg p-2 font-medium placeholder:text-secondary/50 text-on-surfacemain"
+          />
+        </div>
+        <button 
+          onClick={() => setShowFilters(!showFilters)}
+          className={`md:hidden shrink-0 shadow-[0_4px_24px_rgba(26,28,28,0.04)] w-[60px] rounded-xl flex items-center justify-center transition-colors border ${showFilters ? 'bg-tertiary-container text-tertiary border-tertiary/20' : 'bg-surface-lowest text-secondary border-transparent hover:bg-surface-container'}`}
+        >
+          {showFilters ? <X size={24} /> : <Filter size={24} />}
+        </button>
       </div>
 
       {/* Filters & Export */}
-      <div className="bg-surface-lowest shadow-[0_4px_24px_rgba(26,28,28,0.04)] rounded-2xl p-4 mb-10 flex flex-col md:flex-row items-end gap-4 border border-surface-container">
+      <div className={`bg-surface-lowest shadow-[0_4px_24px_rgba(26,28,28,0.04)] rounded-2xl p-4 mb-10 border border-surface-container ${showFilters ? 'flex flex-col' : 'hidden md:flex md:flex-col lg:flex-row'} items-end gap-4`}>
+        <div className="flex flex-col sm:flex-row w-full gap-4">
         <div className="flex-1 w-full space-y-1">
            <label className="text-xs font-semibold text-secondary uppercase tracking-wider">Blood Group</label>
            <select 
@@ -141,10 +199,25 @@ export default function PatientsList() {
                className="w-full bg-surface-container rounded-lg p-3 text-sm focus:outline-none focus:ring-2 ring-primary/20 border-transparent text-on-surfacemain" />
            </div>
         </div>
-        <div className="shrink-0 w-full md:w-auto">
-          <button onClick={exportCSV} className="w-full flex items-center justify-center gap-2 bg-surface-high hover:bg-[#e0e0e0] text-secondary font-semibold py-3 px-6 rounded-lg transition-colors">
-            <Download size={18} /> Export CSV
+        <div className="shrink-0 w-full md:w-auto flex flex-col sm:flex-row gap-3">
+          <input 
+            type="file" 
+            accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" 
+            ref={fileInputRef} 
+            onChange={handleImport} 
+            className="hidden" 
+          />
+          <button 
+            disabled={importing} 
+            onClick={() => fileInputRef.current?.click()} 
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-surface-high hover:bg-[#e0e0e0] text-secondary font-semibold py-3 px-6 rounded-lg transition-colors disabled:opacity-50"
+          >
+            <Upload size={18} /> {importing ? 'Importing...' : 'Import Excel'}
           </button>
+          <button onClick={exportCSV} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-surface-high hover:bg-[#e0e0e0] text-secondary font-semibold py-3 px-6 rounded-lg transition-colors">
+            <Download size={18} /> Export
+          </button>
+        </div>
         </div>
       </div>
 
